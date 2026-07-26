@@ -1,0 +1,9 @@
+node_modules
+.next
+.env.local
+data/
+*.tsbuildinfo
+next-env.d.ts
+
+# e2e build output — kept apart so it never collides with next dev
+.next-e2e

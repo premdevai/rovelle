@@ -1,0 +1,338 @@
+@import "tailwindcss";
+
+/**
+ * Rovelle design system — dark, warm, cinematic.
+ *
+ * Tokens are the prototype's, verbatim, in shadcn's bare-HSL convention so a
+ * value can be used at any opacity: hsl(var(--primary) / .4).
+ *
+ * The XRD's light "Paper" surface is gone. There is one surface and it is
+ * dark, because the product is used in an evening kitchen with a propped
+ * phone, and because the prototype settled it.
+ */
+
+:root {
+  --background: 30 14% 6%;
+  --foreground: 38 30% 92%;
+  --surface: 30 12% 8%;
+  --surface-elevated: 30 14% 11%;
+  --card: 30 14% 9%;
+  --card-foreground: 38 30% 92%;
+  --popover: 30 14% 9%;
+  --popover-foreground: 38 30% 92%;
+  --primary: 38 60% 62%;
+  --primary-foreground: 30 30% 8%;
+  --primary-glow: 42 80% 70%;
+  --primary-deep: 32 55% 45%;
+  --secondary: 30 12% 14%;
+  --secondary-foreground: 38 25% 88%;
+  --muted: 30 10% 14%;
+  --muted-foreground: 35 12% 62%;
+  --accent: 38 50% 55%;
+  --accent-foreground: 30 30% 8%;
+  --destructive: 12 70% 50%;
+  --destructive-foreground: 38 30% 95%;
+  --border: 35 12% 18%;
+  --input: 35 12% 16%;
+  --ring: 38 60% 62%;
+  --radius: 1rem;
+
+  --glass: 35 18% 14% / 0.45;
+  --glass-border: 38 40% 70% / 0.12;
+  --glass-highlight: 42 80% 80% / 0.08;
+
+  --gradient-warm:
+    radial-gradient(ellipse at top, hsl(38 50% 18% / 0.6), transparent 60%),
+    radial-gradient(ellipse at bottom right, hsl(28 60% 14% / 0.5), transparent 55%),
+    linear-gradient(180deg, hsl(30 14% 5%), hsl(28 16% 7%));
+  --gradient-gold: linear-gradient(135deg, hsl(42 80% 72%), hsl(36 65% 55%) 50%, hsl(30 55% 42%));
+  --gradient-ember: radial-gradient(circle at 30% 20%, hsl(38 70% 55% / 0.18), transparent 50%);
+  --gradient-text-gold: linear-gradient(180deg, hsl(42 80% 78%), hsl(36 60% 55%));
+
+  --shadow-glow: 0 0 80px -10px hsl(38 70% 55% / 0.35);
+  --shadow-deep: 0 30px 80px -30px hsl(0 0% 0% / 0.7);
+  --shadow-card: 0 20px 50px -20px hsl(0 0% 0% / 0.6), 0 0 0 1px hsl(38 40% 70% / 0.06) inset;
+  --ease-cinema: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-surface: hsl(var(--surface));
+  --color-surface-elevated: hsl(var(--surface-elevated));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-glow: hsl(var(--primary-glow));
+  --color-primary-deep: hsl(var(--primary-deep));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --radius-sm: calc(var(--radius) - 8px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 8px);
+
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-face), ui-monospace, monospace;
+
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1280px;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+  /* The warm ambient wash. Fixed so it doesn't slide under long pages. */
+  background: var(--gradient-warm);
+  background-attachment: fixed;
+}
+
+/* ——— type ——————————————————————————————————————————————— */
+
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  /* Fraunces is variable: low softness, mild wonk, optical size tracks the
+     rendered size so large headings tighten the way real display cuts do. */
+  font-variation-settings: "SOFT" 0, "WONK" 1;
+}
+
+/* The gold word inside a heading — "lasting", "cooking", "keep". */
+.text-gold {
+  background: var(--gradient-text-gold);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Small gold letterspaced label. The only place caps are used. */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: hsl(var(--primary) / 0.85);
+}
+
+.eyebrow-muted {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Quantities, timers, temperatures, counts are DATA — mono, tabular, gold. */
+.data {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ——— surfaces ————————————————————————————————————————————— */
+
+.card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+
+.glass {
+  background: hsl(var(--glass));
+  border: 1px solid hsl(var(--glass-border));
+  border-radius: var(--radius);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: var(--shadow-card);
+}
+
+.ember::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-ember);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ——— controls ————————————————————————————————————————————— */
+
+.btn-gold {
+  background: var(--gradient-gold);
+  color: hsl(var(--primary-foreground));
+  border-radius: 999px;
+  font-weight: 500;
+  transition:
+    transform 0.2s var(--ease-cinema),
+    box-shadow 0.3s var(--ease-cinema),
+    filter 0.2s var(--ease-cinema);
+}
+.btn-gold:hover:not(:disabled) {
+  box-shadow: var(--shadow-glow);
+  filter: brightness(1.06);
+}
+.btn-gold:active:not(:disabled) {
+  transform: scale(0.985);
+}
+.btn-gold:disabled {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  font-weight: 450;
+  transition:
+    border-color 0.2s var(--ease-cinema),
+    background 0.2s var(--ease-cinema);
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: hsl(var(--primary) / 0.5);
+  background: hsl(var(--primary) / 0.06);
+}
+.btn-ghost:disabled {
+  opacity: 0.45;
+}
+
+/* A pill with a live dot — "NOW PARSING INSTAGRAM, TIKTOK & YOUTUBE". */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid hsl(var(--glass-border));
+  border-radius: 999px;
+  background: hsl(var(--glass));
+  backdrop-filter: blur(12px);
+}
+
+/**
+ * Inline-editable field. Reads as text until touched — the review screen has
+ * forty of these and it must still read as a recipe, not a form.
+ */
+.field {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: 6px;
+  font: inherit;
+  color: inherit;
+  width: 100%;
+  min-width: 0;
+  transition: background 0.15s var(--ease-cinema);
+}
+.field:hover {
+  border-bottom-color: hsl(var(--border));
+}
+.field:focus {
+  outline: none;
+  background: hsl(var(--input));
+  border-bottom-color: hsl(var(--primary));
+}
+.field::placeholder {
+  color: hsl(var(--muted-foreground) / 0.7);
+  font-style: italic;
+}
+.field option {
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+}
+
+/* Low-confidence values are marked, never silently accepted. */
+.needs-check {
+  border-bottom: 1px solid hsl(var(--destructive)) !important;
+}
+
+/* ——— focus, a11y ————————————————————————————————————————— */
+
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ——— motion ————————————————————————————————————————————— */
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.6s var(--ease-cinema) both;
+}
+.dot-live {
+  animation: pulseDot 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Scrollbar, so it doesn't punch a light hole in a dark page. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: hsl(var(--background)); }
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 999px;
+  border: 2px solid hsl(var(--background));
+}
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.4); }
