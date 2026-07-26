@@ -1,0 +1,98 @@
+You are working in /Users/premkumar/prem/Obsidian/Rovelle-MVP/app
+Next.js 15 App Router + TypeScript. Storage is node:sqlite via src/lib/db.ts.
+Rovelle turns cooking videos into structured recipes (RRF v1) and cooks with you.
+
+DESIGN SYSTEM — dark, warm, cinematic. Read src/app/globals.css first.
+  Tokens:  hsl(var(--primary)) gold · hsl(var(--foreground)) · hsl(var(--muted-foreground))
+           hsl(var(--border)) · hsl(var(--card)) · hsl(var(--input)) · hsl(var(--secondary))
+  Classes: .card .glass .btn-gold .btn-ghost .eyebrow .eyebrow-muted .text-gold
+           .font-display .data .animate-fade-up .pill .dot-live
+  Fonts:   Fraunces (display) + Inter (body) + JetBrains Mono (.data, quantities only)
+  Primitives in src/components/ui.tsx: Display, Eyebrow, GoldButton, GhostButton,
+           GoldLink, GhostLink, Card, LivePill, Stat, MetaStat, ErrorLine, cx,
+           IconArrow IconCheck IconClock IconFlame IconServes IconMic IconPlay
+
+ALREADY DONE — do not change:
+  db.ts has users.is_guest INTEGER DEFAULT 0  and  jobs.events TEXT DEFAULT '[]'
+  UserRow.is_guest: number   JobRow.events: string
+  A guest's users.email holds their guest id (column is NOT NULL UNIQUE).
+
+CROSS-AGENT CONTRACTS — fixed, do not renegotiate:
+  C1  Guest tries to save →  HTTP 401  { "error": "...", "needsAccount": true }
+  C2  Job events are  { at:number, phase:string, note:string, pct?:number }
+      exposed by GET /api/import/[jobId] as  { ...existing, events: JobEvent[] }
+  C3  POST /api/auth on success returns { ok:true, email, claimed:number }
+
+VOICE STACK — Sarvam AI is the only AI vendor in this app. STT, TTS, translate
+  and chat all go through src/lib/sarvam.ts (Saaras STT, Bulbul TTS, sarvam-105b
+  chat) via POST /api/ask. Never add OpenAI/Google/Deepgram/ElevenLabs or any
+  other provider. Browser SpeechRecognition stays only as the free local wake-word
+  listener; anything that must be understood or spoken back goes to Sarvam.
+
+HOUSE STYLE
+  Comments explain WHY, never what. Match the density of files you read.
+  Touch targets >= 44px. Works at 360px wide. Real labels, aria where it earns it.
+  Never fabricate a recipe quantity anywhere — qty:null is the correct answer.
+
+VERIFY BEFORE YOU FINISH — you are not done until this is clean:
+  cd /Users/premkumar/prem/Obsidian/Rovelle-MVP/app && npx tsc --noEmit
+  Other agents edit other files concurrently. Type errors in files you do NOT
+  own are expected — ignore those, ensure YOUR files are clean.
+  Also run:  npx tsx src/lib/selfcheck.ts   (44 assertions must still pass)
+
+Report back: files changed, what you built in <=5 lines, test output. Be concise.
+
+MISSION: a cook with dough on both hands waves at the phone and voice mode
+engages. Complete hands-off. No tapping.
+
+FILES YOU OWN — edit only these:
+  src/lib/wave.ts                 (CREATE — pure detector, no React)
+  src/lib/wave-check.ts           (CREATE — the test)
+  src/components/cook-voice.tsx   (edit)
+  src/lib/i18n/strings.ts         (ADDITIVE ONLY — new keys in the `en` object,
+                                   change nothing that exists)
+
+DO NOT EDIT: cook-mode.tsx, ui.tsx, any other lib, any api route, any page.
+
+READ FIRST: src/components/cook-voice.tsx. It already has push-to-talk via
+MediaRecorder → POST /api/ask, a handsFree toggle using browser SpeechRecognition
+with the wake word "chef", a language select, makeT(dict), and send(audio, text?).
+strings.ts already has cook.freeOn, cook.freeOff, cook.wake, cook.heard.
+
+1. wave.ts — frame differencing. NO ML, NO dependencies.
+     export type WaveSample = { t: number; left: number; right: number }
+     export function isWaveSignature(samples: WaveSample[]): boolean   // PURE
+     export function detectWave(opts: { video, onWave, fps?, onEnergy? }): { stop() }
+   Algorithm: draw the video to an offscreen 32x24 grayscale canvas; per frame sum
+   the absolute pixel difference against the previous frame, separately for the
+   left and right halves; keep a rolling ~1.5s window.
+   !! A wave is left/right dominance ALTERNATING — crossing over 2+ times, above a
+      noise floor. That oscillation test is the whole design: it is what separates
+      a wave from someone walking past, steam rising, or an arm reaching for a
+      spice jar. A plain "lots of motion" threshold false-positives constantly in
+      a kitchen and is not acceptable.
+   Debounce 5s after firing. Keep isWaveSignature pure so it tests with synthetic
+   data and no camera.
+
+2. cook-voice.tsx — a third control beside "Hands-free": "Wave to talk" (camera
+   icon), OFF by default, never request the camera unprompted.
+   - On: getUserMedia({ video:{ facingMode:"user", width:320, height:240 } }),
+     an invisible <video playsInline muted autoPlay className="sr-only">, start
+     detectWave.
+   - On wave: turn hands-free ON, show "Waved — listening", navigator.vibrate?.(120).
+   - Privacy line, visible whenever the camera is on, non-negotiable:
+     "Camera stays on your device. Nothing is recorded or sent."
+   - Stop the track and the detector on toggle-off, unmount, and visibilitychange.
+     A camera left running in the background is unacceptable.
+   - Degrade quietly: no getUserMedia or permission denied → hide the toggle, one
+     line of explanation. Button and wake word keep working exactly as now.
+
+3. wave-check.ts — assert-based, same style as src/lib/selfcheck.ts (read it for
+   the ok() helper and the async main() wrapper; top-level await breaks tsx here).
+   Feed isWaveSignature synthetic samples:
+     1 clean alternating left/right oscillation      -> true
+     2 steady high energy in BOTH halves (walk-past) -> false
+     3 one-directional motion, no alternation        -> false
+     4 low-energy noise                              -> false
+     5 a single crossing, not repeated               -> false
+   Run: npx tsx src/lib/wave-check.ts

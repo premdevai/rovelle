@@ -1,0 +1,82 @@
+You are working in /Users/premkumar/prem/Obsidian/Rovelle-MVP/app
+Next.js 15 App Router + TypeScript. Storage is node:sqlite via src/lib/db.ts.
+Rovelle turns cooking videos into structured recipes (RRF v1) and cooks with you.
+
+DESIGN SYSTEM — dark, warm, cinematic. Read src/app/globals.css first.
+  Tokens:  hsl(var(--primary)) gold · hsl(var(--foreground)) · hsl(var(--muted-foreground))
+           hsl(var(--border)) · hsl(var(--card)) · hsl(var(--input)) · hsl(var(--secondary))
+  Classes: .card .glass .btn-gold .btn-ghost .eyebrow .eyebrow-muted .text-gold
+           .font-display .data .animate-fade-up .pill .dot-live
+  Fonts:   Fraunces (display) + Inter (body) + JetBrains Mono (.data, quantities only)
+  Primitives in src/components/ui.tsx: Display, Eyebrow, GoldButton, GhostButton,
+           GoldLink, GhostLink, Card, LivePill, Stat, MetaStat, ErrorLine, cx,
+           IconArrow IconCheck IconClock IconFlame IconServes IconMic IconPlay
+
+ALREADY DONE — do not change:
+  db.ts has users.is_guest INTEGER DEFAULT 0  and  jobs.events TEXT DEFAULT '[]'
+  UserRow.is_guest: number   JobRow.events: string
+  A guest's users.email holds their guest id (column is NOT NULL UNIQUE).
+
+CROSS-AGENT CONTRACTS — fixed, do not renegotiate:
+  C1  Guest tries to save →  HTTP 401  { "error": "...", "needsAccount": true }
+  C2  Job events are  { at:number, phase:string, note:string, pct?:number }
+      exposed by GET /api/import/[jobId] as  { ...existing, events: JobEvent[] }
+  C3  POST /api/auth on success returns { ok:true, email, claimed:number }
+
+HOUSE STYLE
+  Comments explain WHY, never what. Match the density of files you read.
+  Touch targets >= 44px. Works at 360px wide. Real labels, aria where it earns it.
+  Never fabricate a recipe quantity anywhere — qty:null is the correct answer.
+
+VERIFY BEFORE YOU FINISH — you are not done until this is clean:
+  cd /Users/premkumar/prem/Obsidian/Rovelle-MVP/app && npx tsc --noEmit
+  Other agents edit other files concurrently. Type errors in files you do NOT
+  own are expected — ignore those, ensure YOUR files are clean.
+  Also run:  npx tsx src/lib/selfcheck.ts   (44 assertions must still pass)
+
+Report back: files changed, what you built in <=5 lines, test output. Be concise.
+
+MISSION: a signed-out visitor pastes a URL on the home page and gets a full
+recipe without ever meeting a login screen. The account is asked for only when
+they try to SAVE.
+
+FILES YOU OWN — edit only these:
+  src/app/import/import-form.tsx                    (edit)
+  src/components/save-gate.tsx                      (CREATE)
+  src/app/import/[jobId]/review/review-form.tsx     (edit)
+  src/app/page.tsx                                  (FINISH — see below)
+
+DO NOT EDIT: anything in src/lib/, any api route, ui.tsx, shell.tsx,
+cook-*.tsx, src/app/import/[jobId]/progress.tsx or its page.tsx.
+
+!! START HERE: src/app/page.tsx was already rewritten by a previous run. It
+   passes  variant="hero"  and  note="No account needed. Sign in later to keep
+   it."  to <ImportForm>. THOSE PROPS DO NOT EXIST YET, so the build is broken
+   right now. Your first job is adding them. Read page.tsx, then make it true.
+
+1. import-form.tsx
+   - Add  variant?: "page" | "hero"  (default "page") and  note?: string.
+   - hero: input min-h-[64px] text-[17px] md:text-[18px], wrapper .glass not
+     .card, so it sits on the gradient properly.
+   - hero: collapse the "paste a caption" and "photo of a page" doors behind ONE
+     muted link — "Or paste a caption, or a photo of a page" — that expands to
+     reveal them. Keep every existing path working; delete nothing.
+   - Render `note` under the input in 13-14px muted.
+   - Keep: paste-to-autosubmit after 300ms, ErrorLine, the live/mock capability dot.
+
+2. save-gate.tsx (CREATE) — client component
+   Props: { open: boolean; onClose: () => void; onSignedIn: () => void }
+   - Modal on bg-black/70 backdrop-blur-sm, .glass panel, max-w-[440px], centred.
+   - Eyebrow "Keep it" · Display size="md" "Save this to your cookbook." ·
+     body "Your recipe is ready. Sign in and it's yours — plus every recipe you
+     make after this."
+   - Inline email → 6-digit code against POST /api/auth. READ
+     src/app/enter/enter-form.tsx and copy its exact request/response handling
+     including the dev-only `devCode` field.
+   - On success call onSignedIn(). Esc closes, overlay click closes, autofocus email.
+
+3. review-form.tsx
+   - When PATCH /api/recipes/{id} returns 401 with needsAccount:true (contract C1),
+     do NOT show an error — open <SaveGate>.
+   - After onSignedIn, silently retry the same save, then navigate as originally
+     intended (cookbook or cook). "Save and cook now" behaves the same way.

@@ -1,0 +1,100 @@
+You are working in /Users/premkumar/prem/Obsidian/Rovelle-MVP/app
+Next.js 15 App Router + TypeScript. Storage is node:sqlite via src/lib/db.ts.
+Rovelle turns cooking videos into structured recipes (RRF v1) and cooks with you.
+
+DESIGN SYSTEM — dark, warm, cinematic. Read src/app/globals.css first.
+  Tokens:  hsl(var(--primary)) gold · hsl(var(--foreground)) · hsl(var(--muted-foreground))
+           hsl(var(--border)) · hsl(var(--card)) · hsl(var(--input)) · hsl(var(--secondary))
+  Classes: .card .glass .btn-gold .btn-ghost .eyebrow .eyebrow-muted .text-gold
+           .font-display .data .animate-fade-up .pill .dot-live
+  Fonts:   Fraunces (display) + Inter (body) + JetBrains Mono (.data, quantities only)
+  Primitives in src/components/ui.tsx: Display, Eyebrow, GoldButton, GhostButton,
+           GoldLink, GhostLink, Card, LivePill, Stat, MetaStat, ErrorLine, cx,
+           IconArrow IconCheck IconClock IconFlame IconServes IconMic IconPlay
+
+ALREADY DONE — do not change:
+  db.ts has users.is_guest INTEGER DEFAULT 0  and  jobs.events TEXT DEFAULT '[]'
+  UserRow.is_guest: number   JobRow.events: string
+  A guest's users.email holds their guest id (column is NOT NULL UNIQUE).
+
+CROSS-AGENT CONTRACTS — fixed, do not renegotiate:
+  C1  Guest tries to save →  HTTP 401  { "error": "...", "needsAccount": true }
+  C2  Job events are  { at:number, phase:string, note:string, pct?:number }
+      exposed by GET /api/import/[jobId] as  { ...existing, events: JobEvent[] }
+  C3  POST /api/auth on success returns { ok:true, email, claimed:number }
+
+HOUSE STYLE
+  Comments explain WHY, never what. Match the density of files you read.
+  Touch targets >= 44px. Works at 360px wide. Real labels, aria where it earns it.
+  Never fabricate a recipe quantity anywhere — qty:null is the correct answer.
+
+VERIFY BEFORE YOU FINISH — you are not done until this is clean:
+  cd /Users/premkumar/prem/Obsidian/Rovelle-MVP/app && npx tsc --noEmit
+  Other agents edit other files concurrently. Type errors in files you do NOT
+  own are expected — ignore those, ensure YOUR files are clean.
+  Also run:  npx tsx src/lib/selfcheck.ts   (44 assertions must still pass)
+
+Report back: files changed, what you built in <=5 lines, test output. Be concise.
+
+MISSION: anonymous visitors can import, review and cook. The account is required
+only to SAVE. When a guest signs up, everything they made transfers to the real
+account — losing it at that moment would be the worst bug in the product.
+
+FILES YOU OWN — edit only these:
+  src/lib/guest.ts                            (CREATE)
+  src/lib/guest-check.ts                      (CREATE — the test)
+  src/lib/auth.ts                             (edit)
+  src/app/api/import/route.ts                 (edit)
+  src/app/api/ask/route.ts                    (edit)
+  src/app/api/recipes/[id]/route.ts           (edit)
+  src/app/api/recipes/[id]/cook/route.ts      (edit)
+  src/app/api/recipes/[id]/notes/route.ts     (edit)
+  src/app/api/auth/route.ts                   (edit)
+
+DO NOT EDIT: db.ts, jobs.ts, media.ts, job-status.ts, recipes.ts, any page or
+component, src/app/api/import/[jobId]/*.
+
+READ FIRST: src/lib/auth.ts (HMAC cookie rovelle_session = userId.issued.mac),
+src/lib/api.ts (guard() maps errors to responses), src/lib/jobs.ts
+(spendImport / importsLeft — call them, don't edit them).
+
+1. guest.ts
+     currentOrGuestUser(): Promise<UserRow>   // creates a guest on first call
+     currentAnyUser(): Promise<UserRow | null>
+     isGuest(u): boolean
+     claimGuestWork(guestId, realUserId): Promise<number>
+     NeedsAccountError
+     GUEST_IMPORTS = 1
+   - Guest cookie `rovelle_guest`, SAME HMAC scheme as auth.ts — export sign/verify
+     from auth.ts and reuse them, do not duplicate the crypto.
+   - Creating a guest inserts a users row: id "gst_…", email = the guest id,
+     is_guest = 1, plan 'free', a period_resets_at.
+   - claimGuestWork, ONE transaction: reassign recipes, jobs, cook_sessions
+     SET user_id = real WHERE user_id = guest; delete the guest row; clear the
+     guest cookie; return how many recipes moved.
+     !! There is a UNIQUE(user_id, slug) index. The real account may already own
+        that slug. On conflict suffix -2, -3… Losing a recipe here is unacceptable.
+
+2. Relax the routes: replace requireUser() with currentOrGuestUser() in all the
+   api routes you own.
+   THE ONE GATE — in PATCH /api/recipes/[id], if body.status === "saved" and the
+   caller is a guest, respond exactly per contract C1. Agent 1 depends on that
+   shape byte for byte. Everything else a guest does must work: import, edit a
+   draft, cook, add notes, ask voice questions.
+   Guests get GUEST_IMPORTS (1), not 5. When spent, also 401 + needsAccount:true,
+   message "Sign in to import more. What you've already made stays."
+
+3. POST /api/auth: before setSession() on a successful OTP redeem, read the guest
+   cookie and if it maps to a guest row call claimGuestWork. Return contract C3.
+
+4. guest-check.ts — assert-based, same style as src/lib/selfcheck.ts. READ IT for
+   the ok(label, fn) helper and the async function main() wrapper — top-level
+   await breaks tsx here. Set process.env.ROVELLE_DB to a temp file before
+   importing anything, exactly as selfcheck.ts does. Cover:
+     1 guest row created with is_guest = 1
+     2 a guest can own a draft recipe
+     3 claim moves recipes AND jobs AND cook_sessions
+     4 the guest row is deleted afterwards
+     5 a slug collision during claim loses nothing — both survive, one renamed
+     6 cooked_count and notes survive intact
+   Run: npx tsx src/lib/guest-check.ts

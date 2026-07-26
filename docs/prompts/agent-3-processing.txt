@@ -1,0 +1,79 @@
+You are working in /Users/premkumar/prem/Obsidian/Rovelle-MVP/app
+Next.js 15 App Router + TypeScript. Storage is node:sqlite via src/lib/db.ts.
+Rovelle turns cooking videos into structured recipes (RRF v1) and cooks with you.
+
+DESIGN SYSTEM — dark, warm, cinematic. Read src/app/globals.css first.
+  Tokens:  hsl(var(--primary)) gold · hsl(var(--foreground)) · hsl(var(--muted-foreground))
+           hsl(var(--border)) · hsl(var(--card)) · hsl(var(--input)) · hsl(var(--secondary))
+  Classes: .card .glass .btn-gold .btn-ghost .eyebrow .eyebrow-muted .text-gold
+           .font-display .data .animate-fade-up .pill .dot-live
+  Fonts:   Fraunces (display) + Inter (body) + JetBrains Mono (.data, quantities only)
+  Primitives in src/components/ui.tsx: Display, Eyebrow, GoldButton, GhostButton,
+           GoldLink, GhostLink, Card, LivePill, Stat, MetaStat, ErrorLine, cx,
+           IconArrow IconCheck IconClock IconFlame IconServes IconMic IconPlay
+
+ALREADY DONE — do not change:
+  db.ts has users.is_guest INTEGER DEFAULT 0  and  jobs.events TEXT DEFAULT '[]'
+  UserRow.is_guest: number   JobRow.events: string
+  A guest's users.email holds their guest id (column is NOT NULL UNIQUE).
+
+CROSS-AGENT CONTRACTS — fixed, do not renegotiate:
+  C1  Guest tries to save →  HTTP 401  { "error": "...", "needsAccount": true }
+  C2  Job events are  { at:number, phase:string, note:string, pct?:number }
+      exposed by GET /api/import/[jobId] as  { ...existing, events: JobEvent[] }
+  C3  POST /api/auth on success returns { ok:true, email, claimed:number }
+
+HOUSE STYLE
+  Comments explain WHY, never what. Match the density of files you read.
+  Touch targets >= 44px. Works at 360px wide. Real labels, aria where it earns it.
+  Never fabricate a recipe quantity anywhere — qty:null is the correct answer.
+
+VERIFY BEFORE YOU FINISH — you are not done until this is clean:
+  cd /Users/premkumar/prem/Obsidian/Rovelle-MVP/app && npx tsc --noEmit
+  Other agents edit other files concurrently. Type errors in files you do NOT
+  own are expected — ignore those, ensure YOUR files are clean.
+  Also run:  npx tsx src/lib/selfcheck.ts   (44 assertions must still pass)
+
+Report back: files changed, what you built in <=5 lines, test output. Be concise.
+
+MISSION: the processing screen should feel like a modern LLM app doing visible
+work, not four static ticks. Real-time feedback, and partial results as they land.
+
+FILES YOU OWN — edit only these:
+  src/lib/media.ts                            (edit)
+  src/lib/jobs.ts                             (edit)
+  src/lib/job-status.ts                       (edit)
+  src/app/api/import/[jobId]/route.ts         (edit)
+  src/app/api/import/[jobId]/stream/route.ts  (CREATE)
+  src/app/import/[jobId]/progress.tsx         (edit)
+
+DO NOT EDIT: db.ts (jobs.events already exists), extract.ts, parse.ts, sarvam.ts,
+guest.ts, any other api route, any other component.
+
+CURRENT STATE: four coarse phases (fetch → transcribe → extract → validate),
+polled once a second, with elapsed seconds. A 60s import sits on one line for 40
+of them. media.ts already takes an onPhase(note: string) callback — widen it.
+
+1. jobs.ts — an appendEvent(jobId, { phase, note, pct? }) writing to jobs.events
+   (append-only JSON array, contract C2). Emit real events, not decoration:
+     "Found: Punjabi Dal Tadka by Kunal Kapur"
+     "Downloaded 1.5 MB of audio"
+     "Transcribing chunk 2 of 4"            <- the count is already known
+     "Heard: heat the ghee, add cumin…"      <- the first cue, as it lands
+     "Found 19 ingredients"
+     "Writing step 12 of 18"
+   media.ts: widen onPhase to pass { note, pct? } and call it at each real
+   milestone — probe done, download done, split done, per chunk transcribed.
+
+2. job-status.ts — add  events: JobEvent[]  to JobStatus (contract C2).
+
+3. stream/route.ts (CREATE) — Server-Sent Events. A Next route handler returning
+   a ReadableStream, text/event-stream, emitting new events as they appear and
+   closing on done|failed. Keep the existing poll route working untouched as the
+   fallback — SSE behind a proxy is not guaranteed.
+
+4. progress.tsx — consume SSE via EventSource, fall back to the 1s poll if it
+   errors. Render the event log as a live feed (newest last, monospace .data
+   timestamps, muted) with the four phases still shown as the spine above it.
+   The screen must visibly change at least every ~3 seconds on a 2-minute video.
+   Keep: cancel, the >60s reassurance copy, the failure state routing to paste.

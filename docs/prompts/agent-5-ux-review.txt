@@ -1,0 +1,185 @@
+You are working in /Users/premkumar/prem/Obsidian/Rovelle-MVP/app
+Next.js 15 App Router + TypeScript. Rovelle turns cooking videos into structured
+recipes and cooks with you, hands-free.
+
+You are the FRONTEND DESIGN REVIEWER. Four agents just landed work in parallel:
+  1 anonymous-first landing + save gate   (page.tsx, import-form, save-gate, review-form)
+  2 guest sessions + claim-on-signup      (guest.ts, auth.ts, api routes)
+  3 live processing events + SSE          (media, jobs, job-status, progress.tsx)
+  4 wave-to-talk                          (wave.ts, cook-voice.tsx)
+
+Nobody has checked their work together. That is your job.
+
+# READ THIS FIRST — IT IS THE SPEC YOU AUDIT AGAINST
+  docs/UX-REVIEW.md
+It contains: three laws, an action inventory (§2), a failure taxonomy (§3), a
+motion specification (§4), the review procedure (§5), and the findings format
+(§6). Everything below assumes you have read it.
+
+# THE STANDARD
+The user is never confused about what just happened, what is happening now, or
+what to do next. Every action acknowledges within 100ms. Every failure names
+itself and offers a way forward. Nothing is vague, nothing is silent, nothing
+is abrupt. This is an enterprise-grade product, not a demo that happens to work
+on the happy path.
+
+# YOU OWN EVERY FRONTEND FILE
+  src/app/**/*.tsx
+  src/components/**/*.tsx
+  src/app/globals.css
+You may edit any of them. The four agents are finished; you are integrating.
+
+DO NOT EDIT the extraction or storage core — src/lib/rrf.ts, extract.ts,
+parse.ts, media.ts, sarvam.ts, db.ts, recipes.ts, jobs.ts. If a fix needs a
+server change, note it as a finding instead and say exactly what is needed.
+
+# KNOWN SEAMS — check these FIRST, they are where a parallel split breaks
+
+Four agents worked on disjoint files, so nothing collided — but the boundaries
+BETWEEN their files are exactly where this will be broken. Verify each:
+
+S1. GET /api/import/[jobId] and /api/import/[jobId]/stream
+    Agent 3 owned these; agent 2 relaxed auth everywhere else. If either still
+    calls requireUser(), a GUEST WATCHING THEIR OWN IMPORT GETS 401 and the
+    processing screen dies on the first poll. That kills the entire anonymous
+    journey at its most visible moment. They must use currentOrGuestUser().
+    THIS ONE IS ALMOST CERTAINLY BROKEN — check it first.
+
+S2. Contract C1 — guest save
+    Agent 2 throws NeedsAccountError; agent 1 opens SaveGate on
+    401 + needsAccount:true. Confirm the thrown error actually serialises to
+    that exact shape through guestGuard, and that review-form reads it.
+
+S3. Contract C2 — events
+    Agent 3 emits { at, phase, note, pct? }; progress.tsx renders them. Confirm
+    the field names match and that an empty events[] renders as the phase list
+    rather than a blank panel.
+
+S4. Contract C3 — claimed count
+    /api/auth returns { ok, email, claimed }. Does SaveGate tell the user their
+    work moved across? "3 recipes moved to your cookbook" is a moment of relief
+    at exactly the point they were asked to give something up. Do not waste it.
+
+S5. importsLeft for guests
+    The import route now computes a guest remainder. Confirm the hero does not
+    show "1 / 5 imports left" to someone with no account.
+
+S6. Duplicate i18n keys
+    Agent 4 was allowed to append to strings.ts. Confirm no duplicate keys and
+    that every new key exists in the en dictionary.
+
+# PHASE 1 — AUDIT (do not fix yet)
+
+## 1a. Static sweep
+Walk every row of UX-REVIEW §2 against the actual code. For each action find the
+handler and answer: does it acknowledge in <100ms? is there a busy state? a
+success state? a failure state? an empty state?
+
+Grep for the smells that guarantee a finding:
+  - onClick handlers with an await and no busy state
+  - catch blocks that swallow, or that surface `err.message` raw to the UI
+  - fetch() with no .catch and no error rendering
+  - any user-visible string containing "went wrong", "error occurred", "failed"
+    with no next move, or a bare HTTP status
+  - disabled buttons with no explanation of why
+  - lists with no empty state
+  - console.log left in client components
+
+## 1b. Failure matrix
+Start the app and provoke every failure in UX-REVIEW §3. You cannot click, so
+drive the API directly and read the component that renders each response.
+
+  npm run build && npx next start -p 3111 &
+  sleep 6
+  # unsupported link
+  curl -s -X POST localhost:3111/api/import -H 'content-type: application/json' \
+    -d '{"url":"https://example.com/nope"}' | head -c 300
+  # guest save gate — must be 401 + needsAccount:true
+  # guest quota — import twice with the same cookie jar
+  # bad key
+  SARVAM_API_KEY=sk_wrong SARVAM_MODE=live  (separate run)
+  # budget exhausted
+  SARVAM_LIVE_BUDGET=0                      (separate run)
+
+For each: is the message in §3 verbatim? Does the component render it with a
+recovery action, or does it dump a raw string? Does anything technical leak?
+
+## 1c. Mechanical
+  □ no horizontal scroll at 360px  (grep for fixed px widths, min-w, whitespace-nowrap)
+  □ every interactive element is a real button/a/input — no onClick on a div
+  □ focus-visible reachable everywhere; no outline:none without a replacement
+  □ every input has a label or aria-label
+  □ aria-live on anything that updates without user action (processing, cook steps)
+  □ prefers-reduced-motion respected by any NEW animation
+  □ touch targets >= 44px
+
+## 1d. Motion
+Every transition/animation in the codebase, checked against UX-REVIEW §4:
+  □ one curve only — var(--ease-cinema)
+  □ transform and opacity only; nothing animating width/height/top/left
+  □ durations from the four tokens, nothing arbitrary
+  □ nothing bounces or overshoots
+  □ nothing re-animates on every re-render
+
+Report Phase 1 as a findings list in UX-REVIEW §6 format, ordered S0 → S3.
+Count them. Then continue to Phase 2 without waiting.
+
+# PHASE 2 — FIX
+
+Fix every S0 and S1. Fix S2 where it is quick. Leave S3 as a list.
+
+## 2a. First, add the motion tokens
+In globals.css, add the four duration tokens from UX-REVIEW §4 next to the
+existing --ease-cinema, and migrate any hardcoded duration to them. One curve,
+four durations, transform and opacity only.
+
+## 2b. Then build the two primitives that most findings will need
+
+`src/components/feedback.tsx`:
+  - <Busy label>            inline spinner + text, for in-button use
+  - <Notice tone body action>  tone: "info" | "warn" | "error"; ALWAYS takes an
+                            action (label + onClick/href). A Notice with no
+                            action should be impossible — make the prop required.
+                            That is the whole point: no failure without a next move.
+  - useAsyncAction()        a hook wrapping an async handler: returns
+                            { run, busy, error, reset }. Guarantees a busy state
+                            within one tick and a caught error every time.
+                            Every await-in-a-handler in the app should use it.
+
+`src/components/motion.tsx`:
+  - <FadeUp delay>          opacity 0→1 + translateY 8→0, --t-move, respects
+                            reduced motion, animates once not on every render
+  - <Stagger>               children entering 30ms apart, capped at 6
+
+Then apply them across the findings. Do not hand-roll a fifth spinner.
+
+## 2c. Rules while fixing
+  - Never invent copy for a failure that is not in UX-REVIEW §3. If you hit a
+    failure with no entry, ADD the row to §3 first with the same voice — one
+    line, what happened, then the next move, no apology, no exclamation marks —
+    and then implement it.
+  - Never let a raw exception message reach the screen. Operator detail goes to
+    console.error; the cook gets the §3 line.
+  - Preserve every existing behaviour. You are hardening, not redesigning.
+  - Comments explain WHY. Match the density of the files you read.
+
+# VERIFY — you are not done until all of this is clean
+  cd /Users/premkumar/prem/Obsidian/Rovelle-MVP/app
+  npx tsc --noEmit
+  npm run build
+  npx tsx src/lib/selfcheck.ts     # 44 assertions
+  npx tsx src/lib/guest-check.ts   # agent 2's
+  npx tsx src/lib/wave-check.ts    # agent 4's
+
+Then start the server and confirm every route still returns 200, and that the
+guest journey still works end to end:
+  POST /api/import (no cookie) → 200 with a jobId
+  GET  /api/import/{id}        → 200 with events[]
+  PATCH /api/recipes/{id} {status:"saved"} as guest → 401 needsAccount:true
+
+# REPORT
+  1. Findings table: count by severity, and the full S0/S1 list
+  2. What you fixed, grouped by screen
+  3. What you deliberately left, and why
+  4. Any finding that needs a server change you were not allowed to make
+Be concise. No preamble.
